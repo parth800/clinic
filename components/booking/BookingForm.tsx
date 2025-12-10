@@ -117,7 +117,7 @@ export default function BookingForm({ clinic }: BookingFormProps) {
             }
 
             // 2. Create appointment
-            const { error: appointmentError } = await supabase
+            const { data: newAppointment, error: appointmentError } = await supabase
                 .from('appointments')
                 .insert({
                     clinic_id: clinic.id,
@@ -129,9 +129,23 @@ export default function BookingForm({ clinic }: BookingFormProps) {
                     booking_source: 'web',
                     booking_notes: formData.reason,
                     token_number: Math.floor(Math.random() * 1000) + 1, // Temporary generation
-                } as any);
+                } as any)
+                .select()
+                .single<{ id: string }>();
 
             if (appointmentError) throw appointmentError;
+
+            // 3. Send confirmation SMS
+            try {
+                await fetch('/api/sms/send-confirmation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ appointmentId: newAppointment.id }),
+                });
+            } catch (smsError) {
+                console.error('SMS confirmation failed:', smsError);
+                // Don't fail the booking if SMS fails
+            }
 
             setBookingSuccess(true);
             toast.success('Appointment booked successfully!');
