@@ -39,11 +39,13 @@ export default function NewInvoicePage() {
     useEffect(() => {
         async function fetchPatients() {
             try {
+                if (!user?.id) return;
+
                 const { data: userData } = await supabase
                     .from('users')
                     .select('clinic_id')
-                    .eq('id', user?.id)
-                    .single();
+                    .eq('id', user.id)
+                    .single<{ clinic_id: string }>();
 
                 if (!userData) return;
 
@@ -108,11 +110,16 @@ export default function NewInvoicePage() {
         setLoading(true);
 
         try {
+            if (!user?.id) {
+                toast.error('User not authenticated');
+                return;
+            }
+
             const { data: userData } = await supabase
                 .from('users')
                 .select('clinic_id')
-                .eq('id', user?.id)
-                .single();
+                .eq('id', user.id)
+                .single<{ clinic_id: string }>();
 
             if (!userData) {
                 toast.error('User not found');
@@ -132,12 +139,13 @@ export default function NewInvoicePage() {
 
                 subtotal,
                 discount: formData.discount,
-                discount_amount: discountAmount,
+                tax: 0, // Required by schema
                 total_amount: totalAmount,
 
                 payment_method: formData.payment_method,
                 payment_status: formData.payment_status,
                 paid_amount: formData.payment_status === 'paid' ? totalAmount : formData.paid_amount,
+                payment_date: formData.payment_status !== 'pending' ? new Date().toISOString() : null,
 
                 notes: formData.notes || null,
                 created_by: user?.id,
@@ -145,7 +153,7 @@ export default function NewInvoicePage() {
 
             const { error } = await supabase
                 .from('invoices')
-                .insert(invoiceData);
+                .insert(invoiceData as any);
 
             if (error) throw error;
 

@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { Prescription, Patient } from '@/types';
-import { ArrowLeft, User, Activity, Pill, FileText, Calendar } from 'lucide-react';
+import { ArrowLeft, User, Activity, Pill, FileText, Calendar, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils';
 
@@ -13,8 +13,10 @@ interface PrescriptionWithPatient extends Prescription {
     patient: Patient;
 }
 
-export default function PrescriptionDetailPage() {
-    const params = useParams();
+import { use } from 'react';
+
+export default function PrescriptionDetailPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = use(params);
     const { user } = useAuth();
     const [prescription, setPrescription] = useState<PrescriptionWithPatient | null>(null);
     const [loading, setLoading] = useState(true);
@@ -28,7 +30,7 @@ export default function PrescriptionDetailPage() {
             *,
             patient:patients(*)
           `)
-                    .eq('id', params.id)
+                    .eq('id', id)
                     .single();
 
                 if (error) throw error;
@@ -40,10 +42,10 @@ export default function PrescriptionDetailPage() {
             }
         }
 
-        if (user && params.id) {
+        if (user && id) {
             fetchPrescription();
         }
-    }, [user, params.id]);
+    }, [user, id]);
 
     if (loading) {
         return (
@@ -72,21 +74,37 @@ export default function PrescriptionDetailPage() {
     const labTests = prescription.lab_tests as any || {};
 
     return (
-        <div>
-            <div className="mb-8">
-                <Link
-                    href="/dashboard/prescriptions"
-                    className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-4"
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to Prescriptions
-                </Link>
-                <div>
+        <div className="print:p-0">
+            <div className="mb-8 print:hidden">
+                <div className="flex items-center justify-between">
+                    <Link
+                        href="/dashboard/prescriptions"
+                        className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to Prescriptions
+                    </Link>
+                    <button
+                        onClick={() => window.print()}
+                        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                    >
+                        <Printer className="h-4 w-4" />
+                        Print Prescription
+                    </button>
+                </div>
+                <div className="mt-4">
                     <h1 className="text-2xl font-bold text-gray-900">Prescription Details</h1>
                     <p className="mt-1 text-sm text-gray-600">
                         {formatDate(prescription.created_at)}
                     </p>
                 </div>
+            </div>
+
+            {/* Print Header */}
+            <div className="hidden print:block mb-8 text-center border-b pb-6">
+                <h1 className="text-3xl font-bold text-blue-600">ClinicFlow</h1>
+                <p className="text-gray-600 mt-2">Medical Prescription</p>
+                <p className="text-sm text-gray-500 mt-1">Date: {formatDate(prescription.created_at)}</p>
             </div>
 
             <div className="space-y-6">

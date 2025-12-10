@@ -13,8 +13,10 @@ interface InvoiceWithPatient extends Invoice {
     patient: Patient;
 }
 
-export default function InvoiceDetailPage() {
-    const params = useParams();
+import { use } from 'react';
+
+export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = use(params);
     const { user } = useAuth();
     const [invoice, setInvoice] = useState<InvoiceWithPatient | null>(null);
     const [loading, setLoading] = useState(true);
@@ -28,7 +30,7 @@ export default function InvoiceDetailPage() {
             *,
             patient:patients(*)
           `)
-                    .eq('id', params.id)
+                    .eq('id', id)
                     .single();
 
                 if (error) throw error;
@@ -40,10 +42,10 @@ export default function InvoiceDetailPage() {
             }
         }
 
-        if (user && params.id) {
+        if (user && id) {
             fetchInvoice();
         }
-    }, [user, params.id]);
+    }, [user, id]);
 
     if (loading) {
         return (
@@ -224,7 +226,7 @@ export default function InvoiceDetailPage() {
                             <div className="flex justify-between text-sm">
                                 <span className="text-gray-600">Discount ({invoice.discount}%):</span>
                                 <span className="font-medium text-green-600">
-                                    -{formatCurrency(invoice.discount_amount || 0)}
+                                    -{formatCurrency(invoice.discount_amount || (invoice.subtotal * invoice.discount / 100))}
                                 </span>
                             </div>
                         )}

@@ -21,11 +21,13 @@ export default function BillingPage() {
     useEffect(() => {
         async function fetchInvoices() {
             try {
+                if (!user?.id) return;
+
                 const { data: userData } = await supabase
                     .from('users')
                     .select('clinic_id')
-                    .eq('id', user?.id)
-                    .single();
+                    .eq('id', user.id)
+                    .single<{ clinic_id: string }>();
 
                 if (!userData) return;
 
@@ -64,14 +66,14 @@ export default function BillingPage() {
         .filter(inv => inv.payment_status === 'paid')
         .reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
     const pendingAmount = invoices
-        .filter(inv => inv.payment_status === 'pending' || inv.payment_status === 'partial')
+        .filter(inv => inv.payment_status === 'unpaid' || inv.payment_status === 'partial')
         .reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
 
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'paid':
                 return 'bg-green-100 text-green-800';
-            case 'pending':
+            case 'unpaid':
                 return 'bg-yellow-100 text-yellow-800';
             case 'partial':
                 return 'bg-blue-100 text-blue-800';
@@ -136,7 +138,7 @@ export default function BillingPage() {
                     className="rounded-md border border-gray-300 px-3 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                     <option value="all">All Status</option>
-                    <option value="pending">Pending</option>
+                    <option value="unpaid">Unpaid</option>
                     <option value="partial">Partial</option>
                     <option value="paid">Paid</option>
                     <option value="cancelled">Cancelled</option>

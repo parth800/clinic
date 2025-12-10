@@ -14,8 +14,10 @@ interface AppointmentWithPatient extends Appointment {
     patient: Patient;
 }
 
-export default function AppointmentDetailPage() {
-    const params = useParams();
+import { use } from 'react';
+
+export default function AppointmentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = use(params);
     const router = useRouter();
     const { user } = useAuth();
     const [appointment, setAppointment] = useState<AppointmentWithPatient | null>(null);
@@ -30,7 +32,7 @@ export default function AppointmentDetailPage() {
             *,
             patient:patients(*)
           `)
-                    .eq('id', params.id)
+                    .eq('id', id)
                     .single();
 
                 if (error) throw error;
@@ -42,10 +44,10 @@ export default function AppointmentDetailPage() {
             }
         }
 
-        if (user && params.id) {
+        if (user && id) {
             fetchAppointment();
         }
-    }, [user, params.id]);
+    }, [user, id]);
 
     if (loading) {
         return (

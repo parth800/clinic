@@ -30,11 +30,13 @@ export default function NewAppointmentPage() {
     useEffect(() => {
         async function fetchPatients() {
             try {
+                if (!user?.id) return;
+
                 const { data: userData } = await supabase
                     .from('users')
                     .select('clinic_id')
-                    .eq('id', user?.id)
-                    .single();
+                    .eq('id', user.id)
+                    .single<{ clinic_id: string }>();
 
                 if (!userData) return;
 
@@ -61,11 +63,13 @@ export default function NewAppointmentPage() {
     useEffect(() => {
         async function fetchAvailableSlots() {
             try {
+                if (!user?.id) return;
+
                 const { data: userData } = await supabase
                     .from('users')
                     .select('clinic_id')
-                    .eq('id', user?.id)
-                    .single();
+                    .eq('id', user.id)
+                    .single<{ clinic_id: string }>();
 
                 if (!userData) return;
 
@@ -74,7 +78,7 @@ export default function NewAppointmentPage() {
                     .from('clinics')
                     .select('working_hours, slot_duration')
                     .eq('id', userData.clinic_id)
-                    .single();
+                    .single<{ working_hours: any; slot_duration: number }>();
 
                 if (!clinicData) return;
 
@@ -102,7 +106,8 @@ export default function NewAppointmentPage() {
                     .eq('clinic_id', userData.clinic_id)
                     .eq('appointment_date', formData.appointment_date)
                     .not('status', 'in', '(cancelled,no_show)')
-                    .is('deleted_at', null);
+                    .is('deleted_at', null)
+                    .returns<{ appointment_time: string }[]>();
 
                 const booked = appointments?.map(apt => apt.appointment_time) || [];
                 setBookedSlots(booked);
@@ -140,11 +145,16 @@ export default function NewAppointmentPage() {
         setLoading(true);
 
         try {
+            if (!user?.id) {
+                toast.error('User not authenticated');
+                return;
+            }
+
             const { data: userData } = await supabase
                 .from('users')
                 .select('clinic_id')
-                .eq('id', user?.id)
-                .single();
+                .eq('id', user.id)
+                .single<{ clinic_id: string }>();
 
             if (!userData) {
                 toast.error('User not found');
@@ -166,7 +176,7 @@ export default function NewAppointmentPage() {
 
             const { error } = await supabase
                 .from('appointments')
-                .insert(appointmentData);
+                .insert(appointmentData as any);
 
             if (error) throw error;
 

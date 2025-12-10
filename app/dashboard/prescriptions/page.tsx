@@ -20,11 +20,13 @@ export default function PrescriptionsPage() {
     useEffect(() => {
         async function fetchPrescriptions() {
             try {
+                if (!user?.id) return;
+
                 const { data: userData } = await supabase
                     .from('users')
                     .select('clinic_id')
-                    .eq('id', user?.id)
-                    .single();
+                    .eq('id', user.id)
+                    .single<{ clinic_id: string }>();
 
                 if (!userData) return;
 

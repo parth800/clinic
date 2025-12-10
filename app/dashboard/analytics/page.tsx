@@ -44,11 +44,13 @@ export default function AnalyticsPage() {
     useEffect(() => {
         async function fetchAnalytics() {
             try {
+                if (!user?.id) return;
+
                 const { data: userData } = await supabase
                     .from('users')
                     .select('clinic_id')
-                    .eq('id', user?.id)
-                    .single();
+                    .eq('id', user.id)
+                    .single<{ clinic_id: string }>();
 
                 if (!userData) return;
 
@@ -60,7 +62,8 @@ export default function AnalyticsPage() {
                     .from('patients')
                     .select('created_at')
                     .eq('clinic_id', userData.clinic_id)
-                    .is('deleted_at', null);
+                    .is('deleted_at', null)
+                    .returns<{ created_at: string }[]>();
 
                 const totalPatients = patients?.length || 0;
                 const newPatientsThisMonth = patients?.filter(
@@ -68,19 +71,20 @@ export default function AnalyticsPage() {
                 ).length || 0;
 
                 // Fetch appointments
-                const { data: appointments } = await supabase
+                const { data: allAppointments } = await supabase
                     .from('appointments')
                     .select('created_at, status')
                     .eq('clinic_id', userData.clinic_id)
-                    .is('deleted_at', null);
+                    .is('deleted_at', null)
+                    .returns<{ created_at: string; status: string }[]>();
 
-                const totalAppointments = appointments?.length || 0;
-                const appointmentsThisMonth = appointments?.filter(
+                const totalAppointments = allAppointments?.length || 0;
+                const appointmentsThisMonth = allAppointments?.filter(
                     a => new Date(a.created_at) >= new Date(firstDayOfMonth)
                 ).length || 0;
 
                 // Count by status
-                const statusCounts = appointments?.reduce((acc, apt) => {
+                const statusCounts = allAppointments?.reduce((acc, apt) => {
                     acc[apt.status] = (acc[apt.status] || 0) + 1;
                     return acc;
                 }, {} as Record<string, number>) || {};
@@ -92,9 +96,10 @@ export default function AnalyticsPage() {
                 // Fetch invoices
                 const { data: invoices } = await supabase
                     .from('invoices')
-                    .select('total_amount, created_at, payment_status')
+                    .select('total_amount, created_at')
                     .eq('clinic_id', userData.clinic_id)
-                    .is('deleted_at', null);
+                    .is('deleted_at', null)
+                    .returns<{ total_amount: number; created_at: string }[]>();
 
                 const totalRevenue = invoices?.reduce((sum, inv) => sum + (inv.total_amount || 0), 0) || 0;
                 const revenueThisMonth = invoices
@@ -126,7 +131,8 @@ export default function AnalyticsPage() {
                     .from('prescriptions')
                     .select('created_at')
                     .eq('clinic_id', userData.clinic_id)
-                    .is('deleted_at', null);
+                    .is('deleted_at', null)
+                    .returns<{ created_at: string }[]>();
 
                 const totalPrescriptions = prescriptions?.length || 0;
                 const prescriptionsThisMonth = prescriptions?.filter(
@@ -143,8 +149,10 @@ export default function AnalyticsPage() {
                     totalPrescriptions,
                     prescriptionsThisMonth,
                 });
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Error fetching analytics:', error);
+                console.error('Error message:', error?.message);
+                console.error('Error details:', JSON.stringify(error, null, 2));
             } finally {
                 setLoading(false);
             }

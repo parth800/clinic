@@ -53,11 +53,13 @@ export default function NewPrescriptionPage() {
     useEffect(() => {
         async function fetchPatients() {
             try {
+                if (!user?.id) return;
+
                 const { data: userData } = await supabase
                     .from('users')
                     .select('clinic_id')
-                    .eq('id', user?.id)
-                    .single();
+                    .eq('id', user.id)
+                    .single<{ clinic_id: string }>();
 
                 if (!userData) return;
 
@@ -108,11 +110,16 @@ export default function NewPrescriptionPage() {
         setLoading(true);
 
         try {
+            if (!user?.id) {
+                toast.error('User not authenticated');
+                return;
+            }
+
             const { data: userData } = await supabase
                 .from('users')
                 .select('clinic_id')
-                .eq('id', user?.id)
-                .single();
+                .eq('id', user.id)
+                .single<{ clinic_id: string }>();
 
             if (!userData) {
                 toast.error('User not found');
@@ -150,7 +157,7 @@ export default function NewPrescriptionPage() {
 
             const { error } = await supabase
                 .from('prescriptions')
-                .insert(prescriptionData);
+                .insert(prescriptionData as any);
 
             if (error) throw error;
 

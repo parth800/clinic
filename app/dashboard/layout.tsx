@@ -59,7 +59,7 @@ export default function DashboardLayout({
 
             {/* Sidebar */}
             <div
-                className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-white shadow-lg transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+                className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-white shadow-lg transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 print:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
                     }`}
             >
                 <div className="flex h-full flex-col">
@@ -122,7 +122,7 @@ export default function DashboardLayout({
             {/* Main content */}
             <div className="flex flex-1 flex-col overflow-hidden">
                 {/* Header */}
-                <header className="flex h-16 items-center justify-between border-b bg-white px-6 shadow-sm">
+                <header className="flex h-16 items-center justify-between border-b bg-white px-6 shadow-sm print:hidden">
                     <button
                         onClick={() => setSidebarOpen(true)}
                         className="lg:hidden"

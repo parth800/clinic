@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { User as UserType, Clinic } from '@/types';
 import toast from 'react-hot-toast';
 import { Save, Building2, Clock, User } from 'lucide-react';
 
@@ -26,6 +27,7 @@ export default function SettingsPage() {
         pincode: '',
         specialization: '',
         slot_duration: 15,
+        slug: '',
     });
 
     const [workingHours, setWorkingHours] = useState<WorkingHours>({
@@ -47,12 +49,14 @@ export default function SettingsPage() {
     useEffect(() => {
         async function fetchSettings() {
             try {
+                if (!user?.id) return;
+
                 // Get user's clinic_id
                 const { data: userRecord } = await supabase
                     .from('users')
                     .select('*, clinic:clinics(*)')
-                    .eq('id', user?.id)
-                    .single();
+                    .eq('id', user.id)
+                    .single<UserType & { clinic: Clinic }>();
 
                 if (!userRecord) return;
 
@@ -67,6 +71,7 @@ export default function SettingsPage() {
                         pincode: userRecord.clinic.pincode || '',
                         specialization: userRecord.clinic.specialization || '',
                         slot_duration: userRecord.clinic.slot_duration || 15,
+                        slug: userRecord.clinic.slug || '',
                     });
 
                     // Set working hours if available, merge with defaults
@@ -118,11 +123,16 @@ export default function SettingsPage() {
         setLoading(true);
 
         try {
+            if (!user?.id) {
+                toast.error('User not authenticated');
+                return;
+            }
+
             const { data: userRecord } = await supabase
                 .from('users')
                 .select('clinic_id')
-                .eq('id', user?.id)
-                .single();
+                .eq('id', user.id)
+                .single<{ clinic_id: string }>();
 
             if (!userRecord) {
                 toast.error('User not found');
@@ -131,6 +141,7 @@ export default function SettingsPage() {
 
             const { error } = await supabase
                 .from('clinics')
+                // @ts-ignore
                 .update({
                     name: clinicData.name,
                     phone: clinicData.phone,
@@ -141,7 +152,7 @@ export default function SettingsPage() {
                     specialization: clinicData.specialization,
                     slot_duration: clinicData.slot_duration,
                     working_hours: workingHours,
-                })
+                } as any)
                 .eq('id', userRecord.clinic_id);
 
             if (error) throw error;
@@ -160,14 +171,20 @@ export default function SettingsPage() {
         setLoading(true);
 
         try {
+            if (!user?.id) {
+                toast.error('User not authenticated');
+                return;
+            }
+
             const { error } = await supabase
                 .from('users')
+                // @ts-ignore
                 .update({
                     full_name: userData.full_name,
                     phone: userData.phone,
                     specialization: userData.specialization,
-                })
-                .eq('id', user?.id);
+                } as any)
+                .eq('id', user.id);
 
             if (error) throw error;
 
@@ -199,6 +216,40 @@ export default function SettingsPage() {
                 <p className="mt-1 text-sm text-gray-600">
                     Manage your clinic profile and preferences
                 </p>
+            </div>
+
+            {/* Booking Link */}
+            <div className="rounded-lg bg-white p-6 shadow">
+                <div className="mb-4 flex items-center gap-3">
+                    <Building2 className="h-6 w-6 text-blue-600" />
+                    <h2 className="text-lg font-semibold text-gray-900">Patient Booking Link</h2>
+                </div>
+                <p className="mb-4 text-sm text-gray-600">
+                    Share this link with your patients to let them book appointments online.
+                </p>
+                <div className="flex items-center gap-2">
+                    <code className="flex-1 rounded bg-gray-100 p-3 text-sm text-gray-800">
+                        {typeof window !== 'undefined' ? `${window.location.origin}/book/${clinicData.slug}` : `/book/${clinicData.slug}`}
+                    </code>
+                    <button
+                        onClick={() => {
+                            const url = `${window.location.origin}/book/${clinicData.slug}`;
+                            navigator.clipboard.writeText(url);
+                            toast.success('Link copied to clipboard!');
+                        }}
+                        className="rounded-lg bg-blue-100 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-200"
+                    >
+                        Copy
+                    </button>
+                    <a
+                        href={`/book/${clinicData.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                        Open
+                    </a>
+                </div>
             </div>
 
             {/* Clinic Information */}

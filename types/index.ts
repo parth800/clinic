@@ -48,7 +48,7 @@ export interface Database {
             }
             invoices: {
                 Row: Invoice
-                Insert: Omit<Invoice, 'id' | 'invoice_number' | 'created_at' | 'updated_at'>
+                Insert: Omit<Invoice, 'id' | 'created_at' | 'updated_at'>
                 Update: Partial<Omit<Invoice, 'id' | 'invoice_number'>>
             }
         }
@@ -251,6 +251,7 @@ export interface Invoice {
     items: InvoiceItem[]
     subtotal: number
     discount: number
+    discount_amount?: number
     tax: number
     total_amount: number
     payment_status: 'unpaid' | 'partial' | 'paid' | 'cancelled'

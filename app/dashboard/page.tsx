@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { Users, Calendar, FileText, TrendingUp } from 'lucide-react';
+import DoctorView from '@/components/dashboard/DoctorView';
+import ReceptionistView from '@/components/dashboard/ReceptionistView';
 
 interface Stats {
     todayAppointments: number;
@@ -14,6 +16,7 @@ interface Stats {
 
 export default function DashboardPage() {
     const { user } = useAuth();
+    const [userRole, setUserRole] = useState<string | null>(null);
     const [stats, setStats] = useState<Stats>({
         todayAppointments: 0,
         totalPatients: 0,
@@ -23,16 +26,20 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        async function fetchStats() {
+        async function fetchData() {
             try {
-                // Get user's clinic_id
+                if (!user?.id) return;
+
+                // Get user's role and clinic_id
                 const { data: userData } = await supabase
                     .from('users')
-                    .select('clinic_id')
-                    .eq('id', user?.id)
-                    .single();
+                    .select('clinic_id, role')
+                    .eq('id', user.id)
+                    .single<{ clinic_id: string; role: string }>();
 
                 if (!userData) return;
+
+                setUserRole(userData.role);
 
                 const today = new Date().toISOString().split('T')[0];
 
@@ -58,10 +65,21 @@ export default function DashboardPage() {
                     .eq('clinic_id', userData.clinic_id)
                     .is('deleted_at', null);
 
+                // Fetch today's revenue
+                const { data: todayInvoices } = await supabase
+                    .from('invoices')
+                    .select('paid_amount')
+                    .eq('clinic_id', userData.clinic_id)
+                    .eq('invoice_date', today)
+                    .neq('payment_status', 'cancelled')
+                    .returns<{ paid_amount: number }[]>();
+
+                const todayRevenue = todayInvoices?.reduce((sum, invoice) => sum + (invoice.paid_amount || 0), 0) || 0;
+
                 setStats({
                     todayAppointments: appointmentsCount || 0,
                     totalPatients: patientsCount || 0,
-                    todayRevenue: 0, // Will be calculated from invoices later
+                    todayRevenue,
                     completedToday: completedCount || 0,
                 });
             } catch (error) {
@@ -72,10 +90,31 @@ export default function DashboardPage() {
         }
 
         if (user) {
-            fetchStats();
+            fetchData();
         }
     }, [user]);
 
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent mx-auto"></div>
+                    <p className="mt-4 text-gray-600">Loading dashboard...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Render role-specific views
+    if (userRole === 'doctor') {
+        return <DoctorView />;
+    }
+
+    if (userRole === 'receptionist') {
+        return <ReceptionistView />;
+    }
+
+    // Default admin view
     const statCards = [
         {
             name: "Today's Appointments",
@@ -102,17 +141,6 @@ export default function DashboardPage() {
             color: 'bg-orange-500',
         },
     ];
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading dashboard...</p>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div>
@@ -147,37 +175,37 @@ export default function DashboardPage() {
             <div className="bg-white rounded-lg shadow p-6 mb-8">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <button className="flex items-center gap-3 rounded-lg border-2 border-dashed border-gray-300 p-4 text-left hover:border-blue-500 hover:bg-blue-50 transition-colors">
+                    <a href="/dashboard/appointments/new" className="flex items-center gap-3 rounded-lg border-2 border-dashed border-gray-300 p-4 text-left hover:border-blue-500 hover:bg-blue-50 transition-colors">
                         <Calendar className="h-8 w-8 text-blue-600" />
                         <div>
                             <p className="font-medium text-gray-900">New Appointment</p>
                             <p className="text-sm text-gray-500">Book a patient</p>
                         </div>
-                    </button>
+                    </a>
 
-                    <button className="flex items-center gap-3 rounded-lg border-2 border-dashed border-gray-300 p-4 text-left hover:border-green-500 hover:bg-green-50 transition-colors">
+                    <a href="/dashboard/patients/new" className="flex items-center gap-3 rounded-lg border-2 border-dashed border-gray-300 p-4 text-left hover:border-green-500 hover:bg-green-50 transition-colors">
                         <Users className="h-8 w-8 text-green-600" />
                         <div>
                             <p className="font-medium text-gray-900">Add Patient</p>
                             <p className="text-sm text-gray-500">Register new patient</p>
                         </div>
-                    </button>
+                    </a>
 
-                    <button className="flex items-center gap-3 rounded-lg border-2 border-dashed border-gray-300 p-4 text-left hover:border-purple-500 hover:bg-purple-50 transition-colors">
+                    <a href="/dashboard/prescriptions/new" className="flex items-center gap-3 rounded-lg border-2 border-dashed border-gray-300 p-4 text-left hover:border-purple-500 hover:bg-purple-50 transition-colors">
                         <FileText className="h-8 w-8 text-purple-600" />
                         <div>
                             <p className="font-medium text-gray-900">New Prescription</p>
                             <p className="text-sm text-gray-500">Create prescription</p>
                         </div>
-                    </button>
+                    </a>
 
-                    <button className="flex items-center gap-3 rounded-lg border-2 border-dashed border-gray-300 p-4 text-left hover:border-orange-500 hover:bg-orange-50 transition-colors">
+                    <a href="/dashboard/analytics" className="flex items-center gap-3 rounded-lg border-2 border-dashed border-gray-300 p-4 text-left hover:border-orange-500 hover:bg-orange-50 transition-colors">
                         <TrendingUp className="h-8 w-8 text-orange-600" />
                         <div>
                             <p className="font-medium text-gray-900">View Reports</p>
                             <p className="text-sm text-gray-500">Analytics & insights</p>
                         </div>
-                    </button>
+                    </a>
                 </div>
             </div>
 
@@ -194,9 +222,9 @@ export default function DashboardPage() {
                     <div className="text-center py-12">
                         <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                         <p className="text-gray-500">No appointments scheduled for today</p>
-                        <button className="mt-4 text-sm font-medium text-blue-600 hover:text-blue-500">
+                        <a href="/dashboard/appointments/new" className="mt-4 inline-block text-sm font-medium text-blue-600 hover:text-blue-500">
                             Book an appointment
-                        </button>
+                        </a>
                     </div>
                 ) : (
                     <div className="text-center py-12">

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { generateSlug } from '@/lib/utils';
+import { Clinic } from '@/types';
 import toast from 'react-hot-toast';
 
 export default function RegisterPage() {
@@ -21,6 +22,7 @@ export default function RegisterPage() {
         confirmPassword: '',
         city: 'Ahmedabad',
         specialization: '',
+        role: 'admin' as 'admin' | 'doctor' | 'receptionist',
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -87,9 +89,9 @@ export default function RegisterPage() {
                     subscription_plan: 'trial',
                     subscription_status: 'active',
                     subscription_start_date: new Date().toISOString(),
-                })
+                } as any)
                 .select()
-                .single();
+                .single<Clinic>();
 
             if (clinicError) {
                 console.error('Clinic creation error:', clinicError);
@@ -100,7 +102,31 @@ export default function RegisterPage() {
 
             console.log('Clinic created:', clinic.id);
 
-            // Create user record linked to clinic
+            // Create user record linked to clinic with role-based permissions
+            const permissions = {
+                admin: {
+                    manage_appointments: true,
+                    manage_patients: true,
+                    manage_prescriptions: true,
+                    manage_billing: true,
+                    manage_settings: true,
+                },
+                doctor: {
+                    manage_appointments: true,
+                    manage_patients: true,
+                    manage_prescriptions: true,
+                    manage_billing: false,
+                    manage_settings: false,
+                },
+                receptionist: {
+                    manage_appointments: true,
+                    manage_patients: true,
+                    manage_prescriptions: false,
+                    manage_billing: true,
+                    manage_settings: false,
+                },
+            };
+
             const { error: userError } = await supabase
                 .from('users')
                 .insert({
@@ -109,16 +135,10 @@ export default function RegisterPage() {
                     full_name: formData.doctorName,
                     email: formData.email,
                     phone: formData.phone,
-                    role: 'admin',
+                    role: formData.role,
                     specialization: formData.specialization,
-                    permissions: {
-                        manage_appointments: true,
-                        manage_patients: true,
-                        manage_prescriptions: true,
-                        manage_billing: true,
-                        manage_settings: true,
-                    },
-                });
+                    permissions: permissions[formData.role],
+                } as any);
 
             if (userError) {
                 console.error('User profile creation error:', userError);
@@ -248,6 +268,29 @@ export default function RegisterPage() {
                                     placeholder="General Physician"
                                 />
                             </div>
+                        </div>
+
+                        <div>
+                            <label htmlFor="role" className="block text-sm font-medium text-gray-700">
+                                Role *
+                            </label>
+                            <select
+                                id="role"
+                                name="role"
+                                required
+                                value={formData.role}
+                                onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'doctor' | 'receptionist' })}
+                                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                            >
+                                <option value="admin">Admin (Full Access)</option>
+                                <option value="doctor">Doctor (Medical Staff)</option>
+                                <option value="receptionist">Receptionist (Front Desk)</option>
+                            </select>
+                            <p className="mt-1 text-xs text-gray-500">
+                                {formData.role === 'admin' && 'Full access to all features including settings and billing'}
+                                {formData.role === 'doctor' && 'Access to patients, appointments, and prescriptions'}
+                                {formData.role === 'receptionist' && 'Access to appointments, patients, and billing'}
+                            </p>
                         </div>
 
                         <div>
