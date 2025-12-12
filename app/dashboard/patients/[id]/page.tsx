@@ -1,13 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { Patient, Appointment, Prescription } from '@/types';
-import { ArrowLeft, User, Phone, Mail, Calendar, FileText, Pill } from 'lucide-react';
+import { ArrowLeft, User, Phone, Mail, Calendar, FileText, Pill, Edit, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils';
 import { use } from 'react';
+import DeleteConfirmationModal from '@/components/ui/DeleteConfirmationModal';
+import toast from 'react-hot-toast';
 
 interface PatientWithRelations extends Patient {
     appointments: Appointment[];
@@ -16,9 +19,11 @@ interface PatientWithRelations extends Patient {
 
 export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
+    const router = useRouter();
     const { user } = useAuth();
     const [patient, setPatient] = useState<PatientWithRelations | null>(null);
     const [loading, setLoading] = useState(true);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     useEffect(() => {
         async function fetchPatient() {
@@ -46,6 +51,37 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             fetchPatient();
         }
     }, [user, id]);
+
+    const handleDelete = async () => {
+        try {
+            // Check if patient has appointments
+            const { count } = await supabase
+                .from('appointments')
+                .select('*', { count: 'exact', head: true })
+                .eq('patient_id', id)
+                .is('deleted_at', null);
+
+            if (count && count > 0) {
+                toast.error(`Cannot delete patient with ${count} existing appointment(s)`);
+                return;
+            }
+
+            // Soft delete patient
+            const { error } = await supabase
+                .from('patients')
+                // @ts-ignore - Supabase type inference issue
+                .update({ deleted_at: new Date().toISOString() })
+                .eq('id', id);
+
+            if (error) throw error;
+
+            toast.success('Patient deleted successfully');
+            router.push('/dashboard/patients');
+        } catch (error: any) {
+            console.error('Error deleting patient:', error);
+            toast.error(error.message || 'Failed to delete patient');
+        }
+    };
 
     if (loading) {
         return (
@@ -79,11 +115,29 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                     <ArrowLeft className="h-4 w-4" />
                     Back to Patients
                 </Link>
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">{patient.full_name}</h1>
-                    <p className="mt-1 text-sm text-gray-600">
-                        Patient ID: {patient.patient_number}
-                    </p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">{patient.full_name}</h1>
+                        <p className="mt-1 text-sm text-gray-600">
+                            Patient ID: {patient.patient_number}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <Link
+                            href={`/dashboard/patients/${id}/edit`}
+                            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        >
+                            <Edit className="h-4 w-4" />
+                            Edit
+                        </Link>
+                        <button
+                            onClick={() => setShowDeleteModal(true)}
+                            className="inline-flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                            Delete
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -230,6 +284,16 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                     <p className="text-sm text-gray-500">No prescriptions yet</p>
                 )}
             </div>
+
+            {/* Delete Confirmation Modal */}
+            <DeleteConfirmationModal
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
+                onConfirm={handleDelete}
+                title="Delete Patient?"
+                message="Are you sure you want to delete this patient? This action cannot be undone. Note: Patients with existing appointments cannot be deleted."
+                confirmText="Delete Patient"
+            />
         </div>
     );
 }
